@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Asset extends Model
 {
     protected $fillable = [
-        'portfolio_id', 'name', 'symbol', 'current_price', 
+        'portfolio_id', 'strategy_id', 'name', 'symbol', 'current_price', 
         'lowest_price_bought', 'highest_price_reached', 'monitoring_point', 
         'comments'
     ];
@@ -19,6 +19,11 @@ class Asset extends Model
 
     public function strategy()
     {
-        return $this->hasOne(Strategy::class);
+        return $this->belongsTo(Strategy::class);
+    }
+
+    public function operations()
+    {
+        return $this->hasMany(Operation::class);
     }
 }

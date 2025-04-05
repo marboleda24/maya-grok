@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\StrategyController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -37,15 +38,17 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     
-    Route::get('/portfolios', [PortfolioController::class, 'index'])->name('portfolios.index');
-    Route::post('/portfolios', [PortfolioController::class, 'store'])->name('portfolios.store');
-    Route::put('/portfolios/{portfolio}', [PortfolioController::class, 'update'])->name('portfolios.update');
-    Route::delete('/portfolios/{portfolio}', [PortfolioController::class, 'destroy'])->name('portfolios.destroy');   
-    
-    Route::get('/portfolios/{portfolio}/assets', [AssetController::class, 'index'])->name('assets.index');
-    Route::post('/portfolios/{portfolio}/assets', [AssetController::class, 'store'])->name('assets.store');
-    Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
-    Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');    
+    // Rutas para Portfolios (usando resource completo)
+    Route::resource('portfolios', PortfolioController::class);
+
+    // Rutas para Assets (usando resource anidado con shallow)
+    Route::resource('portfolios.assets', AssetController::class)->shallow();
+
+    // Ruta personalizada para operar activos
+    Route::post('assets/{asset}/operate', [AssetController::class, 'operate'])->name('assets.operate');
+
+    // Rutas para Strategies (CRUD completo excepto show)
+    Route::resource('strategies', StrategyController::class)->except(['show']);
 });
 
 require __DIR__.'/auth.php';

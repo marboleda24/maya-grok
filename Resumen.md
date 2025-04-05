@@ -61,3 +61,34 @@ Próximos Pasos
 Optimizar el monitoreo para respetar los límites de la API y probar notificaciones.
 Implementar actualizaciones en tiempo real en el frontend (WebSockets con Laravel Echo o polling).
 Pulir la UI de activos con filtros y visualización dinámica.
+
+Abril/5/2025
+Queda funcional gestionando portafolios, activos, estrategias y operaciones
+
+Resumen del Proyecto
+Hemos trabajado en una aplicación con Laravel e Inertia.js para gestionar portafolios, activos y operaciones. Aquí está el estado final:
+
+Funcionalidades Implementadas:
+Portafolios:
+Listado en /portfolios con creación, edición y eliminación.
+Vista de activos por portafolio en /portfolios/{portfolio}/assets.
+Activos:
+Creación, edición y eliminación desde la vista de portafolio.
+Asociación opcional con estrategias.
+Operaciones:
+Nueva filosofía: compras y ventas separadas.
+Compras: Registradas desde un popup con purchase_price, quantity, etc., marcadas como open.
+Ventas: Selección de operaciones abiertas desde el listado, actualización con sale_price, marcadas como closed.
+Listado de operaciones abiertas por activo con opción de vender.
+Problemas Resueltos:
+Error de Ziggy: Corregimos assets.index a portfolios.assets.index en Portfolios/Index.vue.
+Formulario de Operaciones: Solucionamos problemas de envío silencioso y errores de validación (sale_price como número).
+Filosofía de Operaciones: Redefinimos el flujo para separar compras y ventas, eliminando sale_price de compras.
+Error de Renderizado: Arreglamos el acceso a sellingOperation.asset.name usando assets.find.
+Error de BD: Eliminamos y recreamos la tabla operations para incluir type y alinear el esquema.
+Error de operation_id: Aseguramos que sellForm incluya y envíe operation_id correctamente.
+Estado Actual:
+La tabla operations tiene un esquema actualizado con type, status, y columnas relevantes.
+El frontend (Assets/Index.vue) maneja compras y ventas en popups separados.
+El backend (AssetController) procesa ambas acciones correctamente.
+Todo funciona sin errores reportados.

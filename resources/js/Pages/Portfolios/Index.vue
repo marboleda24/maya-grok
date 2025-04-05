@@ -16,20 +16,22 @@
             </div>
             <button type="submit" class="mt-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Crear Portafolio</button>
         </form>
-        <div class="space-y-4">
+        <div v-if="portfolios && portfolios.length" class="space-y-4">
             <div v-for="portfolio in portfolios" :key="portfolio.id" class="border p-4 rounded flex justify-between items-center">
                 <div>
-                    <h2 class="text-lg font-semibold">{{ portfolio.name }}</h2>
+                    <h2 class="text-lg font-semibold">{{ portfolio.name || 'Sin nombre' }}</h2>
                     <p>{{ portfolio.description || 'Sin descripción' }}</p>
-                    <span class="text-sm text-gray-500">Estado: {{ portfolio.status }}</span>
+                    <span class="text-sm text-gray-500">Estado: {{ portfolio.status || 'Desconocido' }}</span>
                 </div>
                 <div class="space-x-2">
-                    <Link :href="route('assets.index', portfolio.id)" class="text-green-500 hover:underline">Ver Activos</Link>
+                    <!-- Cambiar assets.index por portfolios.assets.index -->
+                    <Link :href="route('portfolios.assets.index', portfolio.id)" class="text-green-500 hover:underline">Ver Activos</Link>
                     <button @click="editPortfolio(portfolio)" class="text-blue-500 hover:underline">Editar</button>
                     <button @click="deletePortfolio(portfolio)" class="text-red-500 hover:underline">Eliminar</button>
                 </div>
             </div>
         </div>
+        <div v-else class="text-gray-500">No hay portafolios para mostrar.</div>
         <div v-if="editingPortfolio" class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
             <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
                 <h2 class="text-xl mb-4">Editar Portafolio</h2>
@@ -57,6 +59,7 @@
 </template>
 
 <script>
+// Resto del script sin cambios
 import { defineComponent } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { Link } from '@inertiajs/vue3';
@@ -84,14 +87,18 @@ export default defineComponent({
             editingPortfolio: null
         };
     },
+    mounted() {
+        console.log('Portfolios recibidos:', this.portfolios);
+        console.log('Flash:', this.flash);
+    },
     methods: {
         editPortfolio(portfolio) {
+            console.log('Editando portfolio:', portfolio);
             this.editingPortfolio = portfolio;
-            this.editForm.name = portfolio.name;
-            this.editForm.description = portfolio.description;
-            this.editForm.status = portfolio.status;
+            this.editForm.name = portfolio.name || '';
+            this.editForm.description = portfolio.description || '';
+            this.editForm.status = portfolio.status || 'active';
 
-            // Enfocar el campo "Nombre" y posicionar el cursor al final
             this.$nextTick(() => {
                 const input = this.$refs.nameInput;
                 input.focus();
@@ -101,13 +108,16 @@ export default defineComponent({
         updatePortfolio() {
             this.editForm.put(route('portfolios.update', this.editingPortfolio.id), {
                 onSuccess: () => {
-                    this.editingPortfolio = null; // Cerrar el modal
+                    this.editingPortfolio = null;
+                },
+                onError: (errors) => {
+                    console.log('Errores al actualizar:', errors);
                 }
             });
         },
         deletePortfolio(portfolio) {
             if (confirm('¿Estás seguro de eliminar este portafolio?')) {
-                console.log('Eliminando Portfolio ID:', portfolio.id); // Depurar
+                console.log('Eliminando Portfolio ID:', portfolio.id);
                 this.$inertia.delete(route('portfolios.destroy', portfolio.id));
             }
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Portfolio;
 use App\Models\Asset;
+use App\Models\Strategy;
 use App\Services\AssetValueService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,13 +14,17 @@ class AssetController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Portfolio $portfolio)
+    public function index($portfolioId)
     {
-        $this->authorize('view', $portfolio);
-        $assets = $portfolio->assets()->with('strategy')->get();
+        $portfolio = Portfolio::findOrFail($portfolioId);
+        $assets = Asset::with('operations.asset')->where('portfolio_id', $portfolio->id)->get();
+        $strategies = Strategy::all();
+    
         return Inertia::render('Assets/Index', [
             'portfolio' => $portfolio,
-            'assets' => $assets
+            'assets' => $assets,
+            'strategies' => $strategies,
+            'flash' => session('message') ? ['message' => session('message')] : null,
         ]);
     }
 
@@ -30,10 +35,10 @@ class AssetController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:50',
+            'strategy_id' => 'nullable|exists:strategies,id',
             'comments' => 'nullable|string'
         ]);
 
-        // Consultar valor actual desde la API
         $service = new AssetValueService();
         $currentValue = $service->getCurrentValue($request->symbol);
 
@@ -41,14 +46,14 @@ class AssetController extends Controller
             return redirect()->back()->withErrors(['symbol' => 'No se pudo obtener el valor actual del símbolo proporcionado.']);
         }
 
-        // Crear el activo con valores iniciales
         $asset = $portfolio->assets()->create([
             'name' => $request->name,
             'symbol' => $request->symbol,
-            'current_price' => $currentValue,        // VALOR ACTUAL
-            'highest_price_reached' => $currentValue, // TECHO
-            'lowest_price_bought' => $currentValue,  // PISO
-            'monitoring_point' => $currentValue,     // MONITOREO
+            'strategy_id' => $request->strategy_id,
+            'current_price' => $currentValue,
+            'highest_price_reached' => $currentValue,
+            'lowest_price_bought' => $currentValue,
+            'monitoring_point' => $currentValue,
             'comments' => $request->comments
         ]);
 
@@ -62,24 +67,11 @@ class AssetController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:50',
-            'comments' => 'nullable|string',
-            'buy_threshold' => 'nullable|numeric|min:0|max:1',
-            'sell_threshold' => 'nullable|numeric|min:0',
-            'techo_threshold' => 'nullable|numeric|min:0|max:1'
+            'strategy_id' => 'nullable|exists:strategies,id',
+            'comments' => 'nullable|string'
         ]);
 
-        $asset->update($request->only('name', 'symbol', 'comments'));
-
-        if ($request->buy_threshold || $request->sell_threshold || $request->techo_threshold) {
-            $asset->strategy()->updateOrCreate(
-                ['asset_id' => $asset->id],
-                [
-                    'buy_threshold' => $request->buy_threshold ?? 0.05,
-                    'sell_threshold' => $request->sell_threshold ?? 1.0,
-                    'techo_threshold' => $request->techo_threshold ?? 0.10
-                ]
-            );
-        }
+        $asset->update($request->only('name', 'symbol', 'strategy_id', 'comments'));
 
         return redirect()->route('assets.index', $asset->portfolio->id)->with('message', 'Activo actualizado con éxito');
     }
@@ -90,5 +82,59 @@ class AssetController extends Controller
         $portfolioId = $asset->portfolio->id;
         $asset->delete();
         return redirect()->route('assets.index', $portfolioId)->with('message', 'Activo eliminado con éxito');
+    }
+
+    public function operate(Request $request, Asset $asset)
+    {
+        \Log::info('Datos recibidos en operate:', $request->all());
+
+        if ($request->has('purchase_price')) {
+            // Compra
+            $validated = $request->validate([
+                'purchase_price' => 'required|numeric|min:0',
+                'quantity' => 'required|numeric|min:0',
+                'exchange' => 'required|string|max:255',
+                'buy_commission' => 'nullable|numeric|min:0',
+                'comments' => 'nullable|string',
+            ]);
+
+            $operation = $asset->operations()->create([
+                'type' => 'buy',
+                'purchase_price' => $validated['purchase_price'],
+                'quantity' => $validated['quantity'],
+                'exchange' => $validated['exchange'],
+                'buy_commission' => $validated['buy_commission'] ?? null,
+                'comments' => $validated['comments'],
+                'user_id' => auth()->id(),
+                'status' => 'open',
+            ]);
+        } elseif ($request->has('sale_price')) {
+            // Venta
+            $validated = $request->validate([
+                'sale_price' => 'required|numeric|min:0',
+                'sell_commission' => 'nullable|numeric|min:0',
+                'comments' => 'nullable|string',
+                'operation_id' => 'required|exists:operations,id',
+            ]);
+
+            $operation = $asset->operations()->findOrFail($validated['operation_id']);
+            if ($operation->status !== 'open') {
+                return redirect()->back()->withErrors(['operation' => 'Esta operación ya está cerrada']);
+            }
+
+            $operation->update([
+                'sale_price' => $validated['sale_price'],
+                'sell_commission' => $validated['sell_commission'] ?? null,
+                'comments' => $validated['comments'],
+                'status' => 'closed',
+                'closed_at' => now(),
+                'profitability' => ($validated['sale_price'] - $operation->purchase_price) / $operation->purchase_price,
+            ]);
+        }
+
+        \Log::info('Operación registrada:', $operation->toArray());
+
+        return redirect()->route('portfolios.assets.index', $asset->portfolio_id)
+            ->with('message', 'Operación registrada exitosamente');
     }
 }

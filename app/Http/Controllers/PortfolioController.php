@@ -3,61 +3,76 @@
 namespace App\Http\Controllers;
 
 use App\Models\Portfolio;
-use Inertia\Inertia;
 use Illuminate\Http\Request;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests; // Añadimos el trait
+use Inertia\Inertia;
 
 class PortfolioController extends Controller
 {
-    use AuthorizesRequests; // Incluimos el trait
-
-    //Mostramos el listado de los portafolios que tiene el usuario
     public function index()
     {
         $portfolios = Portfolio::where('user_id', auth()->id())->get();
-        \Log::info('Portfolios enviados: ' . json_encode($portfolios));
-        if ($portfolios->isEmpty()) {
-            $portfolios = [];
-        }
         return Inertia::render('Portfolios/Index', [
-            'portfolios' => $portfolios
+            'portfolios' => $portfolios,
+            'flash' => session('message') ? ['message' => session('message')] : null
         ]);
     }
 
-    //Almacenamos los portaforlios que va creando un usuario
+    public function create()
+    {
+        return Inertia::render('Portfolios/Create');
+    }
+
     public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'in:active,inactive'
+            'status' => 'required|in:active,inactive'
         ]);
 
-        $portfolio = auth()->user()->portfolios()->create($request->only('name', 'description', 'status'), ['user_id' => auth()->id()]);
-        \Log::info('Portfolio creado: ID ' . $portfolio->id . ' | User ID: ' . $portfolio->user_id);
+        Portfolio::create([
+            'user_id' => auth()->id(),
+            'name' => $request->name,
+            'description' => $request->description,
+            'status' => $request->status
+        ]);
 
         return redirect()->route('portfolios.index')->with('message', 'Portafolio creado con éxito');
     }
 
-    //Función para editar los portafolios del usuario
+    public function edit(Portfolio $portfolio)
+    {
+        // Opcional: Autorizar que el usuario sea el dueño
+        if ($portfolio->user_id !== auth()->id()) {
+            abort(403, 'No tienes permiso para editar este portafolio.');
+        }
+        return Inertia::render('Portfolios/Edit', [
+            'portfolio' => $portfolio
+        ]);
+    }
+
     public function update(Request $request, Portfolio $portfolio)
     {
-        $this->authorize('update', $portfolio); // Asegura que solo el dueño pueda editar
+        if ($portfolio->user_id !== auth()->id()) {
+            abort(403, 'No tienes permiso para actualizar este portafolio.');
+        }
 
         $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'status' => 'in:active,inactive'
+            'status' => 'required|in:active,inactive'
         ]);
 
-        $portfolio->update($request->only('name', 'description', 'status'));
+        $portfolio->update($request->all());
+
         return redirect()->route('portfolios.index')->with('message', 'Portafolio actualizado con éxito');
     }
 
     public function destroy(Portfolio $portfolio)
     {
-        \Log::info('Destroy recibido - Portfolio ID: ' . ($portfolio->id ?? 'null') . ' | User ID: ' . ($portfolio->user_id ?? 'null') . ' | Auth User ID: ' . auth()->id());
-        $this->authorize('delete', $portfolio); // Asegura que solo el dueño pueda eliminar
+        if ($portfolio->user_id !== auth()->id()) {
+            abort(403, 'No tienes permiso para eliminar este portafolio.');
+        }
 
         $portfolio->delete();
         return redirect()->route('portfolios.index')->with('message', 'Portafolio eliminado con éxito');
