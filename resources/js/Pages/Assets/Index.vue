@@ -9,8 +9,6 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input v-model="form.name" placeholder="Nombre" class="border p-2 rounded" required />
                 <input v-model="form.symbol" placeholder="Símbolo (ej. AAPL)" class="border p-2 rounded" required />
-                <textarea v-model="form.description" placeholder="Descripción" class="border p-2 rounded"></textarea>
-                <input v-model="form.value" type="number" step="0.01" placeholder="Valor Inicial" class="border p-2 rounded" />
                 <textarea v-model="form.comments" placeholder="Comentarios" class="border p-2 rounded"></textarea>
             </div>
             <button type="submit" class="mt-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Crear Activo</button>
@@ -19,12 +17,12 @@
             <div v-for="asset in assets" :key="asset.id" class="border p-4 rounded flex justify-between items-center">
                 <div>
                     <h2 class="text-lg font-semibold">{{ asset.name }} ({{ asset.symbol }})</h2>
-                    <p>{{ asset.description || 'Sin descripción' }}</p>
-                    <p>Valor Actual: ${{ asset.value }}</p>
-                    <p>Máximo: ${{ asset.max_value || 'N/A' }}</p>
-                    <p>Base: ${{ asset.base_value || 'N/A' }}</p>
+                    <p>Valor Actual: ${{ asset.current_price }}</p>
+                    <p>Techo: ${{ asset.highest_price_reached }}</p>
+                    <p>Piso: ${{ asset.lowest_price_bought }}</p>
+                    <p>Monitoreo: ${{ asset.monitoring_point }}</p>
                     <p>Comentarios: {{ asset.comments || 'Sin comentarios' }}</p>
-                    <p v-if="asset.strategy">Estrategia: Comprar a ${{ asset.strategy.buy_threshold }}, Vender a ${{ asset.strategy.sell_threshold }}</p>
+                    <p v-if="asset.strategy">Estrategia: Comprar a {{ asset.strategy.buy_threshold * 100 }}%, Vender a {{ asset.strategy.sell_threshold * 100 }}%, Techo {{ asset.strategy.techo_threshold * 100 }}%</p>
                 </div>
                 <div class="space-x-2">
                     <button @click="editAsset(asset)" class="text-blue-500 hover:underline">Editar</button>
@@ -38,11 +36,10 @@
                 <form @submit.prevent="updateAsset">
                     <input ref="nameInput" v-model="editForm.name" placeholder="Nombre" class="border p-2 rounded w-full mb-2" required />
                     <input v-model="editForm.symbol" placeholder="Símbolo" class="border p-2 rounded w-full mb-2" required />
-                    <textarea v-model="editForm.description" placeholder="Descripción" class="border p-2 rounded w-full mb-2"></textarea>
-                    <input v-model="editForm.value" type="number" step="0.01" placeholder="Valor" class="border p-2 rounded w-full mb-2" />
                     <textarea v-model="editForm.comments" placeholder="Comentarios" class="border p-2 rounded w-full mb-2"></textarea>
-                    <input v-model="editForm.buy_threshold" type="number" step="0.01" placeholder="Umbral de Compra" class="border p-2 rounded w-full mb-2" />
-                    <input v-model="editForm.sell_threshold" type="number" step="0.01" placeholder="Umbral de Venta" class="border p-2 rounded w-full mb-2" />
+                    <input v-model="editForm.buy_threshold" type="number" step="0.01" placeholder="Umbral de Compra (0-1)" class="border p-2 rounded w-full mb-2" />
+                    <input v-model="editForm.sell_threshold" type="number" step="0.01" placeholder="Umbral de Venta (0-1)" class="border p-2 rounded w-full mb-2" />
+                    <input v-model="editForm.techo_threshold" type="number" step="0.01" placeholder="Umbral de Techo (0-1)" class="border p-2 rounded w-full mb-2" />
                     <div class="flex justify-end space-x-2">
                         <button type="button" @click="editingAsset = null" class="text-gray-500 hover:underline">Cancelar</button>
                         <button type="submit" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Guardar</button>
@@ -65,19 +62,16 @@ export default defineComponent({
         const form = useForm({
             name: '',
             symbol: '',
-            description: '',
-            value: '',
             comments: ''
         });
 
         const editForm = useForm({
             name: '',
             symbol: '',
-            description: '',
-            value: '',
             comments: '',
             buy_threshold: '',
-            sell_threshold: ''
+            sell_threshold: '',
+            techo_threshold: ''
         });
 
         return { form, editForm };
@@ -92,11 +86,10 @@ export default defineComponent({
             this.editingAsset = asset;
             this.editForm.name = asset.name;
             this.editForm.symbol = asset.symbol;
-            this.editForm.description = asset.description;
-            this.editForm.value = asset.value;
             this.editForm.comments = asset.comments;
-            this.editForm.buy_threshold = asset.strategy?.buy_threshold || '';
-            this.editForm.sell_threshold = asset.strategy?.sell_threshold || '';
+            this.editForm.buy_threshold = asset.strategy?.buy_threshold || '0.05';
+            this.editForm.sell_threshold = asset.strategy?.sell_threshold || '1.0';
+            this.editForm.techo_threshold = asset.strategy?.techo_threshold || '0.10';
 
             this.$nextTick(() => {
                 const input = this.$refs.nameInput;
@@ -108,14 +101,6 @@ export default defineComponent({
             this.editForm.put(route('assets.update', this.editingAsset.id), {
                 onSuccess: () => {
                     this.editingAsset = null;
-                    // Actualizar estrategia
-                    this.$inertia.post(route('assets.index', this.editingAsset.portfolio_id), {
-                        strategy: {
-                            asset_id: this.editingAsset.id,
-                            buy_threshold: this.editForm.buy_threshold,
-                            sell_threshold: this.editForm.sell_threshold
-                        }
-                    });
                 }
             });
         },

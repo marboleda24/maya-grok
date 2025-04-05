@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Portfolio;
 use App\Models\Asset;
-use App\Models\Strategy;
+use App\Services\AssetValueService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -30,15 +30,27 @@ class AssetController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:50',
-            'description' => 'nullable|string',
-            'value' => 'nullable|numeric|min:0',
             'comments' => 'nullable|string'
         ]);
 
-        $asset = $portfolio->assets()->create($request->only('name', 'symbol', 'description', 'value', 'comments'));
-        $asset->base_value = $request->value; // Valor inicial como base
-        $asset->max_value = $request->value; // Valor inicial como máximo
-        $asset->save();
+        // Consultar valor actual desde la API
+        $service = new AssetValueService();
+        $currentValue = $service->getCurrentValue($request->symbol);
+
+        if (!$currentValue) {
+            return redirect()->back()->withErrors(['symbol' => 'No se pudo obtener el valor actual del símbolo proporcionado.']);
+        }
+
+        // Crear el activo con valores iniciales
+        $asset = $portfolio->assets()->create([
+            'name' => $request->name,
+            'symbol' => $request->symbol,
+            'current_price' => $currentValue,        // VALOR ACTUAL
+            'highest_price_reached' => $currentValue, // TECHO
+            'lowest_price_bought' => $currentValue,  // PISO
+            'monitoring_point' => $currentValue,     // MONITOREO
+            'comments' => $request->comments
+        ]);
 
         return redirect()->route('assets.index', $portfolio->id)->with('message', 'Activo creado con éxito');
     }
@@ -50,19 +62,22 @@ class AssetController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'symbol' => 'required|string|max:50',
-            'description' => 'nullable|string',
-            'value' => 'nullable|numeric|min:0',
             'comments' => 'nullable|string',
-            'buy_threshold' => 'nullable|numeric|min:0',
-            'sell_threshold' => 'nullable|numeric|min:0'
+            'buy_threshold' => 'nullable|numeric|min:0|max:1',
+            'sell_threshold' => 'nullable|numeric|min:0',
+            'techo_threshold' => 'nullable|numeric|min:0|max:1'
         ]);
 
-        $asset->update($request->only('name', 'symbol', 'description', 'value', 'comments'));
+        $asset->update($request->only('name', 'symbol', 'comments'));
 
-        if ($request->buy_threshold && $request->sell_threshold) {
+        if ($request->buy_threshold || $request->sell_threshold || $request->techo_threshold) {
             $asset->strategy()->updateOrCreate(
                 ['asset_id' => $asset->id],
-                ['buy_threshold' => $request->buy_threshold, 'sell_threshold' => $request->sell_threshold]
+                [
+                    'buy_threshold' => $request->buy_threshold ?? 0.05,
+                    'sell_threshold' => $request->sell_threshold ?? 1.0,
+                    'techo_threshold' => $request->techo_threshold ?? 0.10
+                ]
             );
         }
 
