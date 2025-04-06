@@ -81,7 +81,7 @@ class AssetController extends Controller
         $this->authorize('delete', $asset->portfolio);
         $portfolioId = $asset->portfolio->id;
         $asset->delete();
-        return redirect()->route('assets.index', $portfolioId)->with('message', 'Activo eliminado con éxito');
+        return redirect()->route('portfolios.assets.index', $portfolioId)->with('message', 'Activo eliminado con éxito');
     }
 
     public function operate(Request $request, Asset $asset)

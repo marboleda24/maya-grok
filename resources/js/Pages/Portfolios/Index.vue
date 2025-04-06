@@ -2,7 +2,7 @@
     <div class="max-w-7xl mx-auto p-6">
         <h1 class="text-2xl font-bold mb-4">Mis Portafolios</h1>
         <Link :href="route('dashboard')" class="text-blue-500 hover:underline mb-4 inline-block">Volver al Dashboard</Link>
-        <div v-if="flash && flash.message" class="bg-green-100 text-green-700 p-4 mb-4 rounded">
+        <div v-if="flash && flash.message" class="bg-green-100 text-green-700 p-4 mb-6 rounded-lg shadow fixed top-4 right-4 z-50 animate-fade-in">
             {{ flash.message }}
         </div>
         <form @submit.prevent="form.post(route('portfolios.store'))" class="mb-6">
@@ -124,3 +124,13 @@ export default defineComponent({
     }
 });
 </script>
+
+<style scoped>
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+</style>
