@@ -57,7 +57,7 @@ class AssetController extends Controller
             'comments' => $request->comments
         ]);
 
-        return redirect()->route('assets.index', $portfolio->id)->with('message', 'Activo creado con éxito');
+        return redirect()->route('portfolios.assets.index', $portfolio->id)->with('message', 'Activo creado con éxito');
     }
 
     public function update(Request $request, Asset $asset)
